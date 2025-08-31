@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stopwatch Web Application</title>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --primary: #6200ee;
+      --primary-dark: #3700b3;
+      --secondary: #03dac6;
+      --error: #b00020;
+      --bg: #070707;
+      --text: #070707;
+      --card: #F0C38E;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 500px;
+      background: var(--card);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-weight: 300;
+      color: var(--primary);
+    }
+
+    .stopwatch-container {
+      position: relative;
+      width: 250px;
+      height: 250px;
+      margin: 0 auto 30px;
+    }
+
+    .progress-ring {
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .progress-ring__circle {
+      transition: stroke-dashoffset 0.35s;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+    }
+
+    .display {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.5rem;
+      font-weight: bold;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .milliseconds {
+      font-size: 1.2rem;
+      align-self: flex-end;
+      margin-bottom: 5px;
+      margin-left: 2px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-bottom: 30px;
+    }
+
+    button {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 50px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-width: 100px;
+    }
+
+    .start-btn { background: var(--primary); color: white; }
+    .start-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+
+    .pause-btn { background: #ff9500; color: white; }
+    .pause-btn:hover { background: #e08800; transform: translateY(-2px); }
+
+    .reset-btn { background: var(--error); color: white; }
+    .reset-btn:hover { background: #9c001a; transform: translateY(-2px); }
+
+    .lap-btn { background: var(--secondary); color: #000; }
+    .lap-btn:hover { background: #00c9b8; transform: translateY(-2px); }
+
+    .laps-container {
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 20px;
+      border-top: 1px solid #eee;
+      padding-top: 20px;
+    }
+
+    .lap-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 15px;
+      border-bottom: 1px solid #eee;
+      transition: background 0.2s;
+    }
+
+    .lap-item:hover { background: rgba(0, 0, 0, 0.02); }
+    .lap-number { font-weight: 500; color: var(--primary); }
+    .lap-time { font-family: 'Courier New', Courier, monospace; }
+
+    .fastest-lap { background: rgba(3, 218, 198, 0.1); border-left: 3px solid var(--secondary); }
+    .slowest-lap { background: rgba(176, 0, 32, 0.1); border-left: 3px solid var(--error); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 style="font-weight: bold;">My Stopwatch</h1>
+
+    <div class="stopwatch-container">
+      <svg class="progress-ring" width="250" height="250">
+        <circle class="progress-ring__circle" stroke="#e0e0e0" stroke-width="18" fill="transparent" r="110" cx="125" cy="125"/>
+        <circle class="progress-ring__circle" stroke="var(--primary)" stroke-width="18" stroke-linecap="round" fill="transparent" r="110" cx="125" cy="125"/>
+      </svg>
+
+      <div class="display">
+        <span id="time">00:00:00</span>
+        <span class="milliseconds" id="milliseconds">.00</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="start-btn" id="startBtn"><i class="fas fa-play"></i><b>Start</b></button>
+      <button class="pause-btn" id="pauseBtn" disabled><i class="fas fa-pause"></i><b>Pause</b></button>
+      <button class="reset-btn" id="resetBtn" disabled><i class="fas fa-stop"></i><b>Reset</b></button>
+      <button class="lap-btn" id="lapBtn" disabled><i class="fas fa-flag"></i><b>Lap</b></button>
+    </div>
+
+    <div class="laps-container" id="lapsContainer"></div>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const startBtn = document.getElementById('startBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const lapBtn = document.getElementById('lapBtn');
+      const timeDisplay = document.getElementById('time');
+      const millisecondsDisplay = document.getElementById('milliseconds');
+      const lapsContainer = document.getElementById('lapsContainer');
+      const circle = document.querySelector('.progress-ring__circle:nth-child(2)');
+
+      const radius = circle.r.baseVal.value;
+      const circumference = radius * 2 * Math.PI;
+
+      circle.style.strokeDasharray = `${circumference} ${circumference}`;
+      circle.style.strokeDashoffset = circumference;
+
+      let startTime;
+      let elapsedTime = 0;
+      let timerInterval;
+      let isRunning = false;
+      let laps = [];
+
+      function formatTime(time) {
+        const hours = Math.floor(time / 3600000).toString().padStart(2, '0');
+        const minutes = Math.floor((time % 3600000) / 60000).toString().padStart(2, '0');
+        const seconds = Math.floor((time % 60000) / 1000).toString().padStart(2, '0');
+        const milliseconds = Math.floor((time % 1000) / 10).toString().padStart(2, '0');
+
+        return {
+          time: `${hours}:${minutes}:${seconds}`,
+          milliseconds: `.${milliseconds}`
+        };
+      }
+
+      function updateDisplay(time) {
+        const formatted = formatTime(time);
+        timeDisplay.textContent = formatted.time;
+        millisecondsDisplay.textContent = formatted.milliseconds;
+
+        const progress = (time % 60000) / 60000;
+        const offset = circumference - progress * circumference;
+        circle.style.strokeDashoffset = offset;
+      }
+
+      function startTimer() {
+        if (!isRunning) {
+          startTime = Date.now() - elapsedTime;
+          timerInterval = setInterval(function() {
+            elapsedTime = Date.now() - startTime;
+            updateDisplay(elapsedTime);
+          }, 10);
+          isRunning = true;
+          updateButtons();
+        }
+      }
+
+      function pauseTimer() {
+        if (isRunning) {
+          clearInterval(timerInterval);
+          isRunning = false;
+          updateButtons();
+        }
+      }
+
+      function resetTimer() {
+        clearInterval(timerInterval);
+        elapsedTime = 0;
+        updateDisplay(elapsedTime);
+        isRunning = false;
+        laps = [];
+        lapsContainer.innerHTML = '';
+        circle.style.strokeDashoffset = circumference;
+        updateButtons();
+      }
+
+      function recordLap() {
+        if (isRunning || elapsedTime > 0) {
+          const lapTime = elapsedTime;
+          laps.push(lapTime);
+
+          const lapItem = document.createElement('div');
+          lapItem.className = 'lap-item';
+
+          const formatted = formatTime(lapTime);
+          const lapTimeFormatted = `${formatted.time}${formatted.milliseconds}`;
+
+          lapItem.innerHTML = `
+            <span class="lap-number">Lap ${laps.length}</span>
+            <span class="lap-time">${lapTimeFormatted}</span>
+          `;
+
+          lapsContainer.prepend(lapItem);
+
+          highlightExtremeLaps();
+        }
+      }
+
+      function highlightExtremeLaps() {
+        const lapItems = document.querySelectorAll('.lap-item');
+
+        if (laps.length < 2) return;
+
+        lapItems.forEach(item => {
+          item.classList.remove('fastest-lap', 'slowest-lap');
+        });
+
+        const minTime = Math.min(...laps);
+        const maxTime = Math.max(...laps);
+
+        lapItems.forEach((item, index) => {
+          const lapIndex = laps.length - 1 - index;
+          if (laps[lapIndex] === minTime) {
+            item.classList.add('fastest-lap');
+          } else if (laps[lapIndex] === maxTime) {
+            item.classList.add('slowest-lap');
+          }
+        });
+      }
+
+      function updateButtons() {
+        startBtn.disabled = isRunning;
+        pauseBtn.disabled = !isRunning;
+        resetBtn.disabled = !(isRunning || elapsedTime > 0);
+        lapBtn.disabled = !(isRunning || elapsedTime > 0);
+      }
+
+      startBtn.addEventListener('click', startTimer);
+      pauseBtn.addEventListener('click', pauseTimer);
+      resetBtn.addEventListener('click', resetTimer);
+      lapBtn.addEventListener('click', recordLap);
+
+      updateDisplay(elapsedTime);
+      updateButtons();
+    });
+  </script>
+</body>
+</html>
